@@ -14,13 +14,13 @@ impl Yin {
     pub fn init(threshold: f64, freq_min: f64, freq_max: f64, sample_rate: usize) -> Yin {
         let tau_max = sample_rate / freq_min as usize;
         let tau_min = sample_rate / freq_max as usize;
-        let res = Yin {
+
+        Yin {
             threshold,
             tau_max,
             tau_min,
             sample_rate,
-        };
-        res
+        }
     }
 
     pub fn estimate_freq(&self, audio_sample: &[f64]) -> Result<f64, Box<dyn std::error::Error>> {
@@ -55,9 +55,9 @@ fn diff_function(audio_sample: &[f64], tau_max: usize) -> Vec<f64> {
 fn cmndf(raw_diff: &[f64]) -> Vec<f64> {
     let mut running_sum = 0.0;
     let mut cmndf_diff = vec![0.0];
-    for index in 1..raw_diff.len() {
-        running_sum += raw_diff[index];
-        cmndf_diff.push(raw_diff[index] * index as f64 / running_sum);
+    for (index, sample) in raw_diff.iter().enumerate().skip(1) {
+        running_sum += sample;
+        cmndf_diff.push(sample * index as f64 / running_sum);
     }
 
     cmndf_diff
@@ -77,12 +77,7 @@ fn compute_diff_min(diff_fn: &[f64], min_tau: usize, max_tau: usize, harm_thresh
     0
 }
 
-fn convert_to_frequency(
-    diff_fn: &[f64],
-    max_tau: usize,
-    sample_period: usize,
-    sample_rate: usize,
-) -> f64 {
+fn convert_to_frequency(sample_period: usize, sample_rate: usize) -> f64 {
     let value: f64 = sample_rate as f64 / sample_period as f64;
     value
 }
@@ -95,10 +90,10 @@ pub fn compute_sample_frequency(
     sample_rate: usize,
     threshold: f64,
 ) -> f64 {
-    let diff_fn = diff_function(&audio_sample, tau_max);
+    let diff_fn = diff_function(audio_sample, tau_max);
     let cmndf = cmndf(&diff_fn);
     let sample_period = compute_diff_min(&cmndf, tau_min, tau_max, threshold);
-    convert_to_frequency(&diff_fn, tau_max, sample_period, sample_rate)
+    convert_to_frequency(sample_period, sample_rate)
 }
 
 #[cfg(test)]

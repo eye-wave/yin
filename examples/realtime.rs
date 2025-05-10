@@ -1,6 +1,5 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::*;
-use yin::*;
 
 fn main() {
     let host = cpal::default_host();
@@ -20,7 +19,7 @@ fn run<T: Sample>(device: &Device, config: &StreamConfig) {
     let err_fn = |err| println!("{}", err);
     let stream = device
         .build_input_stream(
-            &config,
+            config,
             move |data, _| write_input_data::<T>(data, &yin),
             err_fn,
         )
