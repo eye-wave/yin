@@ -102,8 +102,6 @@ fn compute_diff_min<F: Float>(
 }
 
 fn convert_to_frequency<F>(
-    diff_fn: &[F],
-    max_tau: usize,
     sample_period: usize,
     sample_rate: usize,
 ) -> F
@@ -130,7 +128,7 @@ where
     let diff_fn = diff_function(&audio_sample, tau_max);
     let cmndf = cmndf(&diff_fn);
     let sample_period = compute_diff_min(&cmndf, tau_min, tau_max, threshold);
-    convert_to_frequency(&diff_fn, tau_max, sample_period, sample_rate)
+    convert_to_frequency(sample_period, sample_rate)
 }
 
 #[cfg(test)]
