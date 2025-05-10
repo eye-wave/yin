@@ -1,29 +1,38 @@
 mod errors;
 
 use errors::UnknownValueError;
+use num_traits::Float;
 
 #[derive(Clone, Debug)]
-pub struct Yin {
-    threshold: f64,
+pub struct Yin<F> {
+    threshold: F,
     tau_max: usize,
     tau_min: usize,
     sample_rate: usize,
 }
 
-impl Yin {
-    pub fn init(threshold: f64, freq_min: f64, freq_max: f64, sample_rate: usize) -> Yin {
-        let tau_max = sample_rate / freq_min as usize;
-        let tau_min = sample_rate / freq_max as usize;
-        let res = Yin {
+impl<F> Yin<F>
+where
+    F: Float
+        + Copy
+        + std::ops::AddAssign
+        + num_traits::FromPrimitive
+        + num_traits::ToPrimitive
+        + std::fmt::Display,
+{
+    pub fn init(threshold: F, freq_min: F, freq_max: F, sample_rate: usize) -> Self {
+        let tau_max = sample_rate / freq_min.to_usize().unwrap();
+        let tau_min = sample_rate / freq_max.to_usize().unwrap();
+
+        Self {
             threshold,
             tau_max,
             tau_min,
             sample_rate,
-        };
-        res
+        }
     }
 
-    pub fn estimate_freq(&self, audio_sample: &[f64]) -> Result<f64, Box<dyn std::error::Error>> {
+    pub fn estimate_freq(&self, audio_sample: &[F]) -> Result<F, Box<dyn std::error::Error>> {
         let sample_frequency = compute_sample_frequency(
             audio_sample,
             self.tau_min,
@@ -40,8 +49,8 @@ impl Yin {
     }
 }
 
-fn diff_function(audio_sample: &[f64], tau_max: usize) -> Vec<f64> {
-    let mut diff_function = vec![0.0; tau_max];
+fn diff_function<F: Float + std::ops::AddAssign>(audio_sample: &[F], tau_max: usize) -> Vec<F> {
+    let mut diff_function = vec![F::zero(); tau_max];
     let tau_max = std::cmp::min(audio_sample.len(), tau_max);
     for tau in 1..tau_max {
         for j in 0..(audio_sample.len() - tau_max) {
@@ -52,18 +61,33 @@ fn diff_function(audio_sample: &[f64], tau_max: usize) -> Vec<f64> {
     diff_function
 }
 
-fn cmndf(raw_diff: &[f64]) -> Vec<f64> {
-    let mut running_sum = 0.0;
-    let mut cmndf_diff = vec![0.0];
+fn cmndf<F>(raw_diff: &[F]) -> Vec<F>
+where
+    F: Float + Copy + std::ops::AddAssign,
+{
+    let mut running_sum = F::zero();
+    let mut cmndf_diff = vec![F::zero()];
+
     for index in 1..raw_diff.len() {
         running_sum += raw_diff[index];
-        cmndf_diff.push(raw_diff[index] * index as f64 / running_sum);
+
+        let cmndf_value = if running_sum.is_zero() {
+            F::zero()
+        } else {
+            raw_diff[index] * F::from(index).unwrap() / running_sum
+        };
+        cmndf_diff.push(cmndf_value);
     }
 
     cmndf_diff
 }
 
-fn compute_diff_min(diff_fn: &[f64], min_tau: usize, max_tau: usize, harm_threshold: f64) -> usize {
+fn compute_diff_min<F: Float>(
+    diff_fn: &[F],
+    min_tau: usize,
+    max_tau: usize,
+    harm_threshold: F,
+) -> usize {
     let mut tau = min_tau;
     while tau < max_tau {
         if diff_fn[tau] < harm_threshold {
@@ -77,24 +101,32 @@ fn compute_diff_min(diff_fn: &[f64], min_tau: usize, max_tau: usize, harm_thresh
     0
 }
 
-fn convert_to_frequency(
-    diff_fn: &[f64],
+fn convert_to_frequency<F>(
+    diff_fn: &[F],
     max_tau: usize,
     sample_period: usize,
     sample_rate: usize,
-) -> f64 {
-    let value: f64 = sample_rate as f64 / sample_period as f64;
-    value
+) -> F
+where
+    F: Float + Copy + num_traits::FromPrimitive,
+{
+    let sample_rate_f = F::from_usize(sample_rate).unwrap_or(F::zero());
+    let sample_period_f = F::from_usize(sample_period).unwrap_or(F::zero());
+
+    sample_rate_f / sample_period_f
 }
 
 // should return a tau that gives the # of elements of offset in a given sample
-pub fn compute_sample_frequency(
-    audio_sample: &[f64],
+pub fn compute_sample_frequency<F>(
+    audio_sample: &[F],
     tau_min: usize,
     tau_max: usize,
     sample_rate: usize,
-    threshold: f64,
-) -> f64 {
+    threshold: F,
+) -> F
+where
+    F: Float + Copy + std::ops::AddAssign + num_traits::FromPrimitive,
+{
     let diff_fn = diff_function(&audio_sample, tau_max);
     let cmndf = cmndf(&diff_fn);
     let sample_period = compute_diff_min(&cmndf, tau_min, tau_max, threshold);
