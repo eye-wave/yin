@@ -1,5 +1,6 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::*;
+use std::time::Duration;
 
 fn main() {
     let host = cpal::default_host();
@@ -26,7 +27,9 @@ fn run<T: Sample>(device: &Device, config: &StreamConfig) {
         .unwrap();
 
     stream.play().unwrap();
-    loop {}
+    loop {
+        std::thread::sleep(Duration::from_secs(1));
+    }
 }
 
 fn write_input_data<T: Sample>(input: &[T], yin: &yin::Yin<f64>) {

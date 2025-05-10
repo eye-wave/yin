@@ -68,13 +68,13 @@ where
     let mut running_sum = F::zero();
     let mut cmndf_diff = vec![F::zero()];
 
-    for index in 1..raw_diff.len() {
-        running_sum += raw_diff[index];
+    for (index, sample) in raw_diff.iter().enumerate().skip(1) {
+        running_sum += *sample;
 
         let cmndf_value = if running_sum.is_zero() {
             F::zero()
         } else {
-            raw_diff[index] * F::from(index).unwrap() / running_sum
+            *sample * F::from(index).unwrap() / running_sum
         };
         cmndf_diff.push(cmndf_value);
     }
@@ -101,10 +101,7 @@ fn compute_diff_min<F: Float>(
     0
 }
 
-fn convert_to_frequency<F>(
-    sample_period: usize,
-    sample_rate: usize,
-) -> F
+fn convert_to_frequency<F>(sample_period: usize, sample_rate: usize) -> F
 where
     F: Float + Copy + num_traits::FromPrimitive,
 {
@@ -125,7 +122,7 @@ pub fn compute_sample_frequency<F>(
 where
     F: Float + Copy + std::ops::AddAssign + num_traits::FromPrimitive,
 {
-    let diff_fn = diff_function(&audio_sample, tau_max);
+    let diff_fn = diff_function(audio_sample, tau_max);
     let cmndf = cmndf(&diff_fn);
     let sample_period = compute_diff_min(&cmndf, tau_min, tau_max, threshold);
     convert_to_frequency(sample_period, sample_rate)
